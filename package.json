@@ -1,6 +1,6 @@
 {
-  "name"           : "TAAS-client"
-, "version"        : "0.0.1"
+  "name"           : "taas-client"
+, "version"        : "0.0.2"
 , "description"    : "Things-as-a-service, client-side."
 , "author"         : {
     "name"         : "Marshall Rose"
@@ -8,18 +8,17 @@
   }
 , "repository"     : {
     "type"         : "git"
-  , "url"          : "https://github.com/TheThingSystem/TAAS-client.git"
+  , "url"          : "https://github.com/TheThingSystem/node-taas-client.git"
   }
 , "bugs"           : {
-    "url"          : "https://github.com/TheThingSystem/TAAS-client/issues"
+    "url"          : "https://github.com/TheThingSystem/node-taas-client/issues"
   }
 , "keywords"       : [ "nat", "cloud", "taas", "rendezvous" ]
 , "engines"        : {
     "node"         : ">=0.10"
   }
 , "dependencies"   : {
-    "mdns"                : "git://github.com/TheThingSystem/node_mdns.git"
-  , "winston"      : "0.7.x"
+    "mdns"         : "git://github.com/TheThingSystem/node_mdns.git"
   , "ws"           : "git://github.com/TheThingSystem/ws.git"
   }
 , "readmeFilename" : "README.md"

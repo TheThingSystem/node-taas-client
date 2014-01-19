@@ -1,6 +1,6 @@
-TAAS-client
-===========
-Things-as-a-service, client-side.
+node-taas-client
+================
+A node.js module to interface with the Things-as-a-service, client-side.
 
 This package implements a node.js module for [#thethingsystem](http://thethingsystem.com/) clients,
 talking either directly to the steward or through a [TAAS server](http://github.com/TheThingsystem/TAAS-server).
@@ -9,14 +9,14 @@ talking either directly to the steward or through a [TAAS server](http://github.
 Install
 -------
 
-    npm install TAAS-client
+    npm install node-taas-client
 
 API
 ---
 
 ### Load
 
-    var ClientAPI = require('TAAS-client');
+    var ClientAPI = require('taas-client');
 
 ### Login to steward
 

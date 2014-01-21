@@ -1,6 +1,6 @@
 {
   "name"           : "taas-client"
-, "version"        : "0.0.2"
+, "version"        : "0.2.0"
 , "description"    : "Things-as-a-service, client-side."
 , "author"         : {
     "name"         : "Marshall Rose"
@@ -19,6 +19,7 @@
   }
 , "dependencies"   : {
     "mdns"         : "git://github.com/TheThingSystem/node_mdns.git"
+  , "underscore"   : "1.5.1"
   , "ws"           : "git://github.com/TheThingSystem/ws.git"
   }
 , "readmeFilename" : "README.md"

@@ -7,6 +7,7 @@ var events      = require('events')
   , mdns        = require('mdns')
   , os          = require('os')
   , url         = require('url')
+  , underscore  = require('underscore')
   , util        = require('util')
   , ws          = require('ws')
   ;
@@ -77,10 +78,10 @@ var singleton = new Singleton();
 
     for web sockets
       params.url      : complete 'ws:' or 'wss:' URL
-           
+
 
     to identify steward
-      steward.name    : e.g., IP address, 127.0.0.1/localhost, place1.name 
+      steward.name    : e.g., IP address, 127.0.0.1/localhost, place1.name
       steward.uuid    : e.g., 2f402f80-da50-11e1-9b23-0123456789ab
       steward.crtData : steward's certificate (either as a buffer or array)
       steward.crtPath : pathname to file containing steward's certificate
@@ -112,69 +113,67 @@ var ClientAPI = function(options) {
 
   self.params = self.options.params || {};
 
-  if (self.params.url) return self.console(self);
+  if (!!self.params.url) return self._console(self);
 
   if (!options.steward) throw new Error('options.steward must be specified');
 
   setTimeout(function() {
-    var didP, entry, host;
+    var ca, didP, entry, host;
 
     if ((options.steward.name === '127.0.0.1') || (options.steward.name === 'localhost')) {
-      self.params.url = 'ws://' + options.steward.name + ':8887';
-      return self.console(self);
+      self.params.url = 'ws://localhost:8887';
+      return self._console(self);
     }
 
     if ((!!options.steward.name) && (options.steward.name.length === 0)) delete(options.steward.name);
 
     didP = false;
-singleton.hosts = {};
     for (host in singleton.hosts) if (singleton.hosts.hasOwnProperty(host)) {
       didP = true;
       entry = singleton.hosts[host];
 
       if (   ((!!options.steward.name)
                   && (entry.host !== (options.steward.name + '.' + entry.replyDomain))
-                  && (entry.txtRecord.name !== options.steward.name))
-          || ((!!options.steward.uuid) && (entry.txtRecord.uuid !== options.steward.uuid))) continue;
+                  && (entry.txtRecord.name !== self.options.steward.name))
+          || ((!!options.steward.uuid) && (entry.txtRecord.uuid !== self.options.steward.uuid))) continue;
 
-      if ((entry.localhost) && (!options.steward.crtData) && (!options.steward.crtPath)) {
+      if (entry.localhost) {
+        self.params.url = 'ws://localhost:8887';
+      } else if ((!options.steward.crtData) && (!options.steward.crtPath)) {
         self.params.url = 'ws://' + entry.host + ':8887';
-        return self.console(self);
+      } else {
+        self.params.url = 'wss://' + entry.host + ':' + entry.port;
       }
 
-      self.params.url = 'wss://' + entry.host + ':' + entry.port;
-      if (util.isArray(options.steward.crtData)) options.steward.crtData = new Buffer(options.steward.crtData);
-      self.params.ca = options.steward.crtData || fs.readFileSync(options.steward.crtPath);
-      if (!!self.params.ca) self.params.ca = [ self.params.ca ];
-      self.params.rejectUnauthorized = false;
-      return self.console(self);
+      return self._console(self);
     }
 
     if ((!options.cloud) || (!options.steward.name)) {
       return self.emit('error', new Error(didP ? 'no matching stewards' : 'no visible stewards'));
     }
 
-    self.params.url = 'wss://' + options.steward.name + '.' + options.cloud.service + ':443';
-    if (util.isArray(options.cloud.crtData)) options.cloud.crtData = new Buffer(options.cloud.crtData);
-    self.params.ca = options.cloud.crtData || fs.readFileSync(options.cloud.crtPath);
-    if (!!self.params.ca) self.params.ca = [ self.params.ca ];
-// TBD: WHY?
-    self.params.rejectUnauthorized = false;
-    self.cloud(self);
+    self.params.url = 'wss://' + self.options.steward.name + '.' + self.options.cloud.service + ':443';
+
+    ca = self.options.cloud.crtData;
+    if (util.isArray(ca)) ca = new Buffer(ca);
+    if ((!ca) && (!!self.options.cloud.crtPath)) ca = fs.readFileSync(self.options.cloud.crtPath);
+    if (!!ca) ca = [ ca ];
+    self._cloud(self, ca);
   }, 250);
 
   return self;
 };
 util.inherits(ClientAPI, events.EventEmitter);
 
-ClientAPI.prototype.cloud = function(self) {
+
+ClientAPI.prototype._cloud = function(self, ca) {
   var didP, options, u;
 
   var retry = function(secs) {
     if (didP) return;
     didP = true;
 
-    setTimeout(function() { self.cloud(self); }, secs * 1000);
+    setTimeout(function() { self._cloud(self, ca); }, secs * 1000);
   };
 
   u = url.parse(self.params.url);
@@ -183,7 +182,7 @@ ClientAPI.prototype.cloud = function(self) {
             , method  : 'GET'
             , path    : ''
             , agent   : false
-            , ca      : self.params.ca
+            , ca      : ca
             };
 
   didP = false;
@@ -199,10 +198,8 @@ ClientAPI.prototype.cloud = function(self) {
         return retry(15);
       }
 
-      self.params.origin = u.hostname + ':' + u.port;
       self.params.url = u.protocol + '//' + r.hostname + ':' + r.port;
-console.log(self.params.url);
-      self.console(self);
+      self._console(self);
     }).on('close', function() {
       self.logger.warning('register', { event:'close', diagnostic: 'premature eof', retry: '1 second' });
       retry(1);
@@ -214,19 +211,27 @@ console.log(self.params.url);
 };
 
 
-ClientAPI.prototype.console = function(self) {
+ClientAPI.prototype._console = function(self) {
+  self.logger.info('console', { event: 'establish', url: self.params.url + '/console' });
+
+  if (util.isArray(self.options.steward.crtData)) self.options.steward.crtData = new Buffer(self.options.steward.crtData);
+  self.params.ca = self.options.steward.crtData;
+  if ((!self.params.ca) && (!self.options.steward.crtPath)) self.params.ca = fs.readFileSync(self.options.steward.crtPath);
+  if (!!self.params.ca) self.params.ca = [ self.params.ca ];
+
   self.console = new ws(self.params.url + '/console', self.params).on('open', function() {
-    self.emit('open');
+    self.emit('open', 'console', false);
 
     self.actors = {};
-    self.manage(self);
+    self.permissions = [];
+    self._manage(self);
   }).on('message', function(data, flags) {
-    var category, entry, i, logs, message;
+    var category, i, logs, message;
 
     if ((!!flags) && (flags.binary === true)) return self.emit(new Error('error binary console message'));
 
     try { message = JSON.parse(data.toString()); } catch(ex) { return self.emit(new Error('error parsing console message')); }
-console.log('.');
+    if (!!message.requestID) return;
 
     for (category in message) if (message.hasOwnProperty(category)) {
       logs = message[category];
@@ -234,276 +239,374 @@ console.log('.');
       if (!util.isArray(logs)) {
         if ((category === 'notice') && (util.isArray(logs.permissions))) {
           self.permissions = logs.permissions;
+          self.emit('ready', 'console', self.permissions);
           continue;
         }
         logs = [ logs ];
       }
       if (category !== '.updates') continue;
 
-      for (i = 0; i< logs.length; i++) {
-        entry = logs[i];
-        self.actors[entry.whoami] = entry;
-      }
+      for (i = 0; i< logs.length; i++) self._merge(self, logs[i]);
     }
   }).on('close', function() {
-    self.emit('close');
+    self.emit('close', 'console');
   }).on('error', function(err) {
-    self.emit('error', err);
+    self.emit('error', 'console', err);
   });
-  
+
   return self;
 };
 
-ClientAPI.prototype.manage = function(self) {
+ClientAPI.prototype._manage = function(self) {
   self.manage = new ws(self.params.url + '/manage', self.params).on('open', function() {
-    self.emit('open');
-
     self.reqno = 1;
     self.callbacks = {};
 
-    self.addCallback = function(cb) {
-      self.callbacks[self.reqno.toString()] = cb;
+    self.addCallback = function(cb, atMost) {
+      self.callbacks[self.reqno.toString()] = { callback: cb, times: atMost };
       return self.reqno++;
     };
 
-self.listActors('', { depth: 'all' }, function(message) { console.log(util.inspect(message, { depth: null })); });
+    self.emit('open', 'management', self.permissions.length === 0);
+    if (self.permissions.indexOf('read') !== -1) self._list(self);
   }).on('message', function(data, flags) {
-    var message, requestID;
+    var callback, doneP, message, requestID;
 
     if ((!!flags) && (flags.binary === true)) return self.emit(new Error('error binary console message'));
 
     try { message = JSON.parse(data.toString()); } catch(ex) { return self.emit(new Error('error parsing console message')); }
 
     requestID = message.requestID.toString();
-    if ((!!self.callbacks[requestID]) && ((self.callbacks[requestID])(message))) delete(self.callbacks[requestID]);
+
+    if (!self.callbacks[requestID]) return;
+
+    callback = self.callbacks[requestID].callback;
+    doneP = (self.callbacks[requestID].times-- < 2) || (!!message.error);
+    if (doneP) delete(self.callbacks[requestID]);
+    callback(message, doneP);
   }).on('close', function() {
-    self.emit('close');
+    self.emit('close', 'management');
   }).on('error', function(err) {
-    self.emit('error', err);
+    self.emit('error', 'management', err);
   });
-  
+
   return self;
 };
 
+ClientAPI.prototype._list = function(self) {
+  self.listActors('', { depth: 'all' }, function(message) {
+    var deviceID, devices, deviceType, entry;
 
-ClientAPI.prototype.login = function(clientID, callback) {/* jshint unused: false */
+    for (deviceType in message.result) {
+      if ((!message.result.hasOwnProperty(deviceType))
+              || ((deviceType.indexOf('/device/') !== 0) && (deviceType.indexOf('/place/') !== 0))) continue;
+
+      devices = message.result[deviceType];
+      for (deviceID in devices) if (devices.hasOwnProperty(deviceID)) {
+        entry = devices[deviceID];
+        entry.whatami = deviceType;
+        entry.whoami = deviceID;
+        self._merge(self, entry);
+      }
+    }
+
+    self.readyP = true;
+    if (!self.user) self.user = { role: 'monitor' };
+    self.emit('ready', 'management', self.user);
+  });
+};
+
+ClientAPI.prototype._merge = function(self, entry) {
+  var actor, whoami;
+
+  whoami = entry.whoami;
+  actor = self.actors[whoami];
+
+  self.actors[whoami] = entry;
+  if ((self.readyP) && ((!actor) || (!underscore.isEqual(entry, actor)))) self.emit('actor', whoami, entry.whatami);
+};
+
+
+ClientAPI.prototype.login = function(clientID, loginCode, callback) {
+  var json;
+
   var self = this;
 
-/*
-{
-  "requestID": "7",
-  "result": {
-    "uuid": "mrose",
-    "name": "mrose",
-    "comments": "Marshall Rose",
-    "role": "master",
-    "lastLogin": "2014-01-18T11:03:06.842Z",
-    "client": {
-      "uuid": "8",
-      "name": "MTR's iPhone 5s",
-      "comments": "",
-      "lastLogin": "2014-01-18T11:03:06.842Z",
-      "clientID": "mrose\/7"
-    }
-  }
-}
-*/
+  if (!self.console) throw new Error('console channel not open');
+  if (!self.manage)  throw new Error('management channel not open');
+
+  json = { path      : '/api/v1/user/authenticate/' + clientID
+         , response  : loginCode
+         , requestID : clientID
+         };
+
+  self.console.send(JSON.stringify(json));
+
+  return self._send(json, function(message) {
+    if (!!message.error) return callback(new Error(message.error.diagnostic), message.error);
+
+    self.user = message.result;
+    callback(null, null);
+    self._list(self);
+  }, true);
+};
+
+ClientAPI.prototype._send = function(json, callback, onceP) {
+  var self = this;
+
+  if (!self.manage) throw new Error('management channel not open');
+
+  json.requestID = self.addCallback(callback, onceP ? 1 : 2);
+  self.manage.send(JSON.stringify(json));
 
   return self;
 };
 
 
-ClientAPI.prototype.createActivity = function(name, armed, event, task, cb) {
-  return this.send({ path      : '/api/v1/activity/create/' + name
-                   , name      : name
-                   , armed     : armed
-                   , event     : event
-                   , task      : task
-                   }, cb);
+ClientAPI.prototype.createActivity = function(name, uuid, event, task, armed, comments, cb) {
+  if ((!name)  || (name.length === 0))  throw new Error('name must be non-empty');
+  if ((!uuid)  || (uuid.length === 0))  throw new Error('uuid must be non-empty');
+  if ((!event) || (event.length === 0)) throw new Error('event must be non-empty');
+  if ((!task)  || (task.length === 0))  throw new Error('task must be non-empty');
+
+  return this._send({ path      : '/api/v1/activity/create/' + name
+                    , name      : name
+                    , uuid      : uuid
+                    , event     : event
+                    , task      : task
+                    , armed     : armed
+                    , comments  : comments
+                    }, cb);
 };
 
-ClientAPI.prototype.createDevice = function(name, whatami, info, cb) {
-  return this.send({ path      : '/api/v1/device/create/' + name
-                   , name      : name
-                   , whatami   : whatami
-                   , info      : info || {}
-                   }, cb);
+ClientAPI.prototype.createDevice = function(name, uuid, whatami, info, comments, cb) {
+  if ((!name)    || (name.length === 0))    throw new Error('name must be non-empty');
+  if ((!uuid)    || (uuid.length === 0))  throw new Error('uuid must be non-empty');
+  if ((!whatami) || (whatami.length === 0)) throw new Error('whatami must be non-empty');
+
+  return this._send({ path      : '/api/v1/device/create/' + name
+                    , name      : name
+                    , uuid      : uuid
+                    , whatami   : whatami
+                    , info      : info || {}
+                    , comments  : comments
+                    }, cb);
 };
 
-ClientAPI.prototype.createEvent = function(name, actor, observe, parameter, cb) {
-  return this.send({ path      : '/api/v1/event/create/' + name
-                   , name      : name
-                   , actor     : actor
-                   , observe   : observe
-                   , parameter : JSON.stringify(parameter) || ''
-                   }, cb);
+ClientAPI.prototype.createEvent = function(name, uuid, actor, observe, parameter, comments, cb) {
+  if ((!name)    || (name.length === 0))    throw new Error('name must be non-empty');
+  if ((!uuid)    || (uuid.length === 0))  throw new Error('uuid must be non-empty');
+  if ((!actor)   || (actor.length === 0))   throw new Error('actor must be non-empty');
+  if ((!observe) || (observe.length === 0)) throw new Error('observe must be non-empty');
+
+  return this._send({ path      : '/api/v1/event/create/' + name
+                    , name      : name
+                    , uuid      : uuid
+                    , actor     : actor
+                    , observe   : observe
+                    , parameter : JSON.stringify(parameter || {})
+                    , comments  : comments
+                    }, cb);
 };
 
-ClientAPI.prototype.createGroup = function(name, type, operator, members, cb) {
-  return this.send({ path      : '/api/v1/group/create/' + name
-                   , name      : name
-                   , type      : type     || ''
-                   , operator  : operator || ''
-                   , members   : members  || []
-                   }, cb);
+ClientAPI.prototype.createGroup = function(name, uuid, type, operator, members, comments, cb) {
+  if ((!name)    || (name.length === 0))    throw new Error('name must be non-empty');
+  if ((!uuid)    || (uuid.length === 0))  throw new Error('uuid must be non-empty');
+
+  return this._send({ path      : '/api/v1/group/create/' + name
+                    , name      : name
+                    , uuid      : uuid
+                    , type      : type     || ''
+                    , operator  : operator || ''
+                    , members   : members  || []
+                    , comments  : comments
+                    }, cb);
 };
 
-ClientAPI.prototype.createTask = function(name, actor, perform, parameter, cb) {
-  return this.send({ path      : '/api/v1/task/create/' + name
-                   , name      : name
-                   , actor     : actor
-                   , perform   : perform
-                   , parameter : JSON.stringify(parameter) || ''
-                   }, cb);
+ClientAPI.prototype.createTask = function(name, uuid, actor, perform, parameter, comments, cb) {
+  if ((!name)    || (name.length === 0))    throw new Error('name must be non-empty');
+  if ((!uuid)    || (uuid.length === 0))  throw new Error('uuid must be non-empty');
+  if ((!actor)   || (actor.length === 0))   throw new Error('actor must be non-empty');
+  if ((!perform) || (perform.length === 0)) throw new Error('perform must be non-empty');
+
+  return this._send({ path      : '/api/v1/task/create/' + name
+                    , name      : name
+                    , actor     : actor
+                    , perform   : perform
+                    , parameter : JSON.stringify(parameter || {})
+                    , comments  : comments
+                    }, cb);
 };
+
+ClientAPI.prototype.createUser = function(name, uuid, role, clientName, comments, cb) {
+  if ((!name) || (name.length === 0)) throw new Error('name must be non-empty');
+  if ((!uuid) || (uuid.length === 0)) throw new Error('uuid must be non-empty');
+
+  return this._send({ path       : '/api/v1/user/create/' + name
+                    , name       : name
+                    , uuid       : uuid
+                    , comments   : comments
+                    , role       : role || ' monitor'
+                    , clientName : clientName
+                    }, cb);
+};
+
 
 ClientAPI.prototype.listActivity = function(activityID, options, cb) {
-  if ((activityID !== '') && (parseInt(activityID, 10) <= 0)) throw new Error('activityID must be positive integer');
+  if (!activityID) activityID = ''; else if (parseInt(activityID, 10) <= 0) throw new Error('eventID must be positive integer');
 
-  return this.send({ path      : '/api/v1/activity/list/' + activityID
-                   , options   : options || {}
-                   }, cb);
+  return this._send({ path      : '/api/v1/activity/list/' + activityID
+                    , options   : options || {}
+                    }, cb, true);
 };
 
 ClientAPI.prototype.listActors = function(prefix, options, cb) {
-  return this.send({ path      : '/api/v1/actor/list/' + prefix
-                   , options   : options || {}
-                   }, cb);
+  if (!prefix) prefix = '';
+
+  return this._send({ path      : '/api/v1/actor/list/' + prefix
+                    , options   : options || {}
+                    }, cb, true);
 };
 
 ClientAPI.prototype.listDevice = function(deviceID, options, cb) {
-  if ((deviceID !== '') && (parseInt(deviceID, 10) <= 0)) throw new Error('deviceID must be positive integer');
+  if (!deviceID) deviceID = ''; else if (parseInt(deviceID, 10) <= 0) throw new Error('eventID must be positive integer');
 
-  return this.send({ path      : '/api/v1/device/list/' + deviceID
-                   , options   : options || {}
-                   }, cb);
+  return this._send({ path      : '/api/v1/device/list/' + deviceID
+                    , options   : options || {}
+                    }, cb, true);
 };
 
 ClientAPI.prototype.listEvent = function(eventID, options, cb) {
-  if ((eventID !== '') && (parseInt(eventID, 10) <= 0)) throw new Error('eventID must be positive integer');
+  if (!eventID) eventID = ''; else if (parseInt(eventID, 10) <= 0) throw new Error('eventID must be positive integer');
 
-  return this.send({ path      : '/api/v1/event/list/' + eventID
-                   , options   : options || {}
-                   }, cb);
+  return this._send({ path      : '/api/v1/event/list/' + eventID
+                    , options   : options || {}
+                    }, cb, true);
 };
 
 ClientAPI.prototype.listGroup = function(groupID, options, cb) {
-  if ((groupID !== '') && (parseInt(groupID, 10) <= 0)) throw new Error('groupID must be positive integer');
+  if (!groupID) groupID = ''; else if (parseInt(groupID, 10) <= 0) throw new Error('groupID must be positive integer');
 
-  return this.send({ path      : '/api/v1/group/list/' + groupID
-                   , options   : options || {}
-                   }, cb);
+  return this._send({ path      : '/api/v1/group/list/' + groupID
+                    , options   : options || {}
+                    }, cb, true);
 };
 
 ClientAPI.prototype.listTask = function(taskID, options, cb) {
-  if ((taskID !== '') && (parseInt(taskID, 10) <= 0)) throw new Error('taskID must be positive integer');
+  if (!taskID) taskID = ''; else if (parseInt(taskID, 10) <= 0) throw new Error('taskID must be positive integer');
 
-  return this.send({ path      : '/api/v1/task/list/' + taskID
-                   , options   : options || {}
-                   }, cb);
+  return this._send({ path      : '/api/v1/task/list/' + taskID
+                    , options   : options || {}
+                    }, cb, true);
 };
 
+ClientAPI.prototype.listUser = function(userID, options ,cb) {
+  if (!userID) userID = '';
+
+  return this._send({ path      : '/api/v1/user/list/' + userID
+                    , options   : options || {}
+                    }, cb);
+};
+
+
 ClientAPI.prototype.modifyActivity = function(activityID, name, armed, event, task, cb) {
-  return this.send({ path      : '/api/v1/activity/modify/' + activityID
-                   , name      : name
-                   , armed     : armed
-                   , event     : event
-                   , task      : task
-                   }, cb);
+  if (parseInt(activityID, 10) <= 0) throw new Error('groupID activityID be positive integer');
+
+  return this._send({ path      : '/api/v1/activity/modify/' + activityID
+                    , name      : name
+                    , armed     : armed
+                    , event     : event
+                    , task      : task
+                    }, cb);
 };
 
 ClientAPI.prototype.modifyGroup = function(groupID, name, type, operator, members, cb) {
-  return this.send({ path      : '/api/v1/group/modify/' + groupID
-                   , name      : name
-                   , type      : type     || ''
-                   , operator  : operator || ''
-                   , members   : members  || []
-                   }, cb);
+  if (parseInt(groupID, 10) <= 0) throw new Error('groupID must be positive integer');
+
+  return this._send({ path      : '/api/v1/group/modify/' + groupID
+                    , name      : name
+                    , type      : type     || ''
+                    , operator  : operator || ''
+                    , members   : members  || []
+                    }, cb);
 };
+
 
 ClientAPI.prototype.performActivity = function(activityID, cb) {
   if (parseInt(activityID, 10) <= 0) throw new Error('activityID must be positive integer');
 
-  return this.send({ path      : '/api/v1/activity/perform/' + activityID
-                   }, cb);
+  return this._send({ path      : '/api/v1/activity/perform/' + activityID
+                    }, cb, true);
 };
 
-ClientAPI.prototype.perform_actors = function(prefix, perform, parameter, cb) {
-  return this.send({ path      : '/api/v1/actor/perform/' + prefix
-                   , perform   : perform
-                   , parameter : JSON.stringify(parameter) || ''
-                   }, cb);
+ClientAPI.prototype.performActors = function(prefix, perform, parameter, cb) {
+  if (!prefix) prefix = '';
+
+  return this._send({ path      : '/api/v1/actor/perform/' + prefix
+                    , perform   : perform
+                    , parameter : JSON.stringify(parameter || {})
+                    }, cb, true);
 };
 
 ClientAPI.prototype.performDevice = function(deviceID, perform, parameter, cb) {
   if (parseInt(deviceID, 10) <= 0) throw new Error('deviceID must be positive integer');
 
-  return this.send({ path      : '/api/v1/device/perform/' + deviceID
-                   , perform   : perform
-                   , parameter : JSON.stringify(parameter) || ''
-                   }, cb);
+  return this._send({ path      : '/api/v1/device/perform/' + deviceID
+                    , perform   : perform
+                    , parameter : JSON.stringify(parameter || {})
+                    }, cb, true);
 };
 
 ClientAPI.prototype.performGroup = function(groupID, perform, parameter, cb) {
   if (parseInt(groupID, 10) <= 0) throw new Error('groupID must be positive integer');
 
-  return this.send({ path      : '/api/v1/group/perform/' + groupID
-                   , perform   : perform
-                   , parameter : JSON.stringify(parameter) || ''
-                   }, cb);
+  return this._send({ path      : '/api/v1/group/perform/' + groupID
+                    , perform   : perform
+                    , parameter : JSON.stringify(parameter || {})
+                    }, cb, true);
 };
 
 ClientAPI.prototype.performTask = function(taskID, cb) {
   if (parseInt(taskID, 10) <= 0) throw new Error('taskID must be positive integer');
 
-  return this.send({ path      : '/api/v1/task/perform/' + taskID
-                   }, cb);
+  return this._send({ path      : '/api/v1/task/perform/' + taskID
+                    }, cb, true);
 };
 
-ClientAPI.prototype.delete_activity = function(activityID, cb) {
+
+ClientAPI.prototype.deleteActivity = function(activityID, cb) {
   if (parseInt(activityID, 10) <= 0) throw new Error('activityID must be positive integer');
 
-  return this.send({ path      : '/api/v1/activity/delete/' + activityID
-                   }, cb);
+  return this._send({ path      : '/api/v1/activity/delete/' + activityID
+                    }, cb);
 };
 
-ClientAPI.prototype.delete_device = function(deviceID, cb) {
+ClientAPI.prototype.deleteDevice = function(deviceID, cb) {
   if (parseInt(deviceID, 10) <= 0) throw new Error('deviceID must be positive integer');
 
-  return this.send({ path      : '/api/v1/device/delete/' + deviceID
-                   }, cb);
+  return this._send({ path      : '/api/v1/device/delete/' + deviceID
+                    }, cb);
 };
 
-ClientAPI.prototype.delete_event = function(eventID, cb) {
+ClientAPI.prototype.deleteEvent = function(eventID, cb) {
   if (parseInt(eventID, 10) <= 0) throw new Error('eventID must be positive integer');
 
-  return this.send({ path      : '/api/v1/event/delete/' + eventID
-                   }, cb);
+  return this._send({ path      : '/api/v1/event/delete/' + eventID
+                    }, cb);
 };
 
-ClientAPI.prototype.delete_group = function(groupID, cb) {
+ClientAPI.prototype.deleteGroup = function(groupID, cb) {
   if (parseInt(groupID, 10) <= 0) throw new Error('groupID must be positive integer');
 
-  return this.send({ path      : '/api/v1/group/delete/' + groupID
-                   }, cb);
+  return this._send({ path      : '/api/v1/group/delete/' + groupID
+                    }, cb);
 };
 
-ClientAPI.prototype.delete_task = function(taskID, cb) {
+ClientAPI.prototype.deleteTask = function(taskID, cb) {
   if (parseInt(taskID, 10) <= 0) throw new Error('taskID must be positive integer');
 
-  return this.send({ path      : '/api/v1/task/delete/' + taskID
-                   }, cb);
-};
-
-
-ClientAPI.prototype.send = function(json, callback) {
-  var self = this;
-
-  if (!self.manage) throw new Error('management port not open');
-
-  json.requestID = self.addCallback(callback);
-  self.manage.send(JSON.stringify(json));
-  return self;
+  return this._send({ path      : '/api/v1/task/delete/' + taskID
+                    }, cb);
 };
 
 

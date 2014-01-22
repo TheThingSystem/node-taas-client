@@ -1,5 +1,4 @@
 var ClientAPI = require('./taas-client')
-  , util      = require('util')
   ;
 
 var steward = new ClientAPI.ClientAPI(
@@ -33,4 +32,3 @@ var steward = new ClientAPI.ClientAPI(
   console.log(channel + ' error: ' + err.message);
   process.exit(0);
 });
-};

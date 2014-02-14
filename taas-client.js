@@ -115,31 +115,30 @@ var ClientAPI = function(options) {
 
   if (!!self.params.url) return self._console(self);
 
-  if (!options.steward) throw new Error('options.steward must be specified');
+  if (!self.options.steward) self.options.steward = {};
 
   setTimeout(function() {
     var ca, didP, entry, host;
 
-    if ((options.steward.name === '127.0.0.1') || (options.steward.name === 'localhost')) {
+    if ((self.options.steward.name === '127.0.0.1') || (self.options.steward.name === 'localhost')) {
       self.params.url = 'ws://localhost:8887';
       return self._console(self);
     }
 
-    if ((!!options.steward.name) && (options.steward.name.length === 0)) delete(options.steward.name);
+    if ((!!self.options.steward.name) && (self.options.steward.name.length === 0)) delete(self.options.steward.name);
 
     didP = false;
     for (host in singleton.hosts) if (singleton.hosts.hasOwnProperty(host)) {
       didP = true;
       entry = singleton.hosts[host];
 
-      if (   ((!!options.steward.name)
-                  && (entry.host !== (options.steward.name + '.' + entry.replyDomain))
+      if (   ((!!self.options.steward.name)
+                  && (entry.host !== (self.options.steward.name + '.' + entry.replyDomain))
+                  && (entry.name + '.' + entry.replyDomain !== self.options.steward.name + '.')
                   && (entry.txtRecord.name !== self.options.steward.name))
-          || ((!!options.steward.uuid) && (entry.txtRecord.uuid !== self.options.steward.uuid))) continue;
+          || ((!!self.options.steward.uuid) && (entry.txtRecord.uuid !== self.options.steward.uuid))) continue;
 
-      if (entry.localhost) {
-        self.params.url = 'ws://localhost:8887';
-      } else if ((!options.steward.crtData) && (!options.steward.crtPath)) {
+      if ((!self.options.steward.crtData) && (!self.options.steward.crtPath)) {
         self.params.url = 'ws://' + entry.host + ':8887';
       } else {
         self.params.url = 'wss://' + entry.host + ':' + entry.port;
@@ -148,7 +147,7 @@ var ClientAPI = function(options) {
       return self._console(self);
     }
 
-    if ((!options.cloud) || (!options.steward.name)) {
+    if ((!self.options.cloud) || (!self.options.steward.name)) {
       return self.emit('error', new Error(didP ? 'no matching stewards' : 'no visible stewards'));
     }
 
@@ -216,7 +215,7 @@ ClientAPI.prototype._console = function(self) {
 
   if (util.isArray(self.options.steward.crtData)) self.options.steward.crtData = new Buffer(self.options.steward.crtData);
   self.params.ca = self.options.steward.crtData;
-  if ((!self.params.ca) && (!self.options.steward.crtPath)) self.params.ca = fs.readFileSync(self.options.steward.crtPath);
+  if ((!self.params.ca) && (!!self.options.steward.crtPath)) self.params.ca = fs.readFileSync(self.options.steward.crtPath);
   if (!!self.params.ca) self.params.ca = [ self.params.ca ];
 
   self.console = new ws(self.params.url + '/console', self.params).on('open', function() {
@@ -228,7 +227,7 @@ ClientAPI.prototype._console = function(self) {
   }).on('message', function(data, flags) {
     var category, i, logs, message;
 
-    if ((!!flags) && (flags.binary === true)) return self.emit(new Error('error binary console message'));
+    if ((!!flags) && (flags.binary === true)) return self.emit(new Error('binary console message'));
 
     try { message = JSON.parse(data.toString()); } catch(ex) { return self.emit(new Error('error parsing console message')); }
     if (!!message.requestID) return;
@@ -251,7 +250,7 @@ ClientAPI.prototype._console = function(self) {
   }).on('close', function() {
     self.emit('close', 'console');
   }).on('error', function(err) {
-    self.emit('error', 'console', err);
+    self.emit('error', err, 'console');
   });
 
   return self;
@@ -272,9 +271,9 @@ ClientAPI.prototype._manage = function(self) {
   }).on('message', function(data, flags) {
     var callback, doneP, message, requestID;
 
-    if ((!!flags) && (flags.binary === true)) return self.emit(new Error('error binary console message'));
+    if ((!!flags) && (flags.binary === true)) return self.emit(new Error('binary management message'));
 
-    try { message = JSON.parse(data.toString()); } catch(ex) { return self.emit(new Error('error parsing console message')); }
+    try { message = JSON.parse(data.toString()); } catch(ex) {return self.emit(new Error('error parsing management message')); }
 
     requestID = message.requestID.toString();
 
@@ -287,7 +286,7 @@ ClientAPI.prototype._manage = function(self) {
   }).on('close', function() {
     self.emit('close', 'management');
   }).on('error', function(err) {
-    self.emit('error', 'management', err);
+    self.emit('error', err, 'management');
   });
 
   return self;
@@ -581,12 +580,14 @@ ClientAPI.prototype.deleteActivity = function(activityID, cb) {
                     }, cb);
 };
 
+/* not yet!
 ClientAPI.prototype.deleteDevice = function(deviceID, cb) {
   if (parseInt(deviceID, 10) <= 0) throw new Error('deviceID must be positive integer');
 
   return this._send({ path      : '/api/v1/device/delete/' + deviceID
                     }, cb);
 };
+ */
 
 ClientAPI.prototype.deleteEvent = function(eventID, cb) {
   if (parseInt(eventID, 10) <= 0) throw new Error('eventID must be positive integer');

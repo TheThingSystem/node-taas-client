@@ -14,4 +14,6 @@ results
 npm-debug.log
 node_modules
 
+test3.js
+test4.js
 *.crt

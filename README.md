@@ -55,7 +55,7 @@ Instead, you may choose to start over or exit, as you see fit.
 
 
     var steward = new ClientAPI.ClientAPI(
-    { steward : { name    : 'arden-arcade'
+    { steward : { name    : 'steward.local'
                 , crtPath : 'server.crt'
                 }
 
@@ -78,7 +78,7 @@ Instead, you may choose to start over or exit, as you see fit.
       // ok, let's get to work!
     }).on('close', function(channel) {
       // typically, just log and recover/exit
-    }).on('error', function(channel, err) {
+    }).on('error', function(err, channel) {
       // typically, just log and recover/exit
     });
 
@@ -154,7 +154,7 @@ hence the callback is made exactly once.
 
     steward.deleteActivity = function(activityID, cb);
 
-    steward.deleteDevice = function(deviceID, cb);
+    // steward.deleteDevice = function(deviceID, cb);
 
     steward.deleteEvent = function(eventID, cb);
 

@@ -20,7 +20,7 @@ API
 
 ### Set!
 
-You can identify steward by either:
+You can identify the steward by either:
 
 - steward.name:
     - IP address, e.g., '192.168.1.xxx', or '127.0.0.1'

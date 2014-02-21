@@ -267,7 +267,7 @@ ClientAPI.prototype._manage = function(self) {
     };
 
     self.emit('open', 'management', self.permissions.length === 0);
-    if (self.permissions.indexOf('read') !== -1) self._list(self);
+    if ((self.permissions.indexOf('read') !== -1) || (self.permissions.indexOf('developer') !== -1)) self._list(self);
   }).on('message', function(data, flags) {
     var callback, doneP, message, requestID;
 

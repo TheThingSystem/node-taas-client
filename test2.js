@@ -1,3 +1,5 @@
+// NB: humans won't be using the API like this, there will be, of course, a higher-level library that manages this detail...
+
 var ClientAPI = require('./taas-client')
   , async     = require('async')
 //, util      = require('util')

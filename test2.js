@@ -5,7 +5,7 @@ var ClientAPI = require('./taas-client')
 //, util      = require('util')
   ;
 
-new ClientAPI.ClientAPI().on('open', function(channel, loginP) {
+new ClientAPI.ClientAPI({ steward: { name: '127.0.0.1' } }).on('open', function(channel, loginP) {
   if (loginP) throw new Error('script should be run locally');
 }).on('ready', function(channel, data) {
   if (channel === 'management') return getToWork(this);

@@ -33,7 +33,14 @@ var steward = new ClientAPI.ClientAPI(
 }).on('ready', function(channel, data) {
   console.log('ready ' + channel + ' data='+ JSON.stringify(data));
 
-  if (channel === 'management') console.log('ready, set, go!');
+  if (channel !== 'management') return;
+
+  console.log('ready, set, go!');
+  steward.listActors(null, { depth: 'all' }, function(message) {
+    console.log(require('util').inspect(message, { depth: null }));
+  });
+}).on('actor', function(whoami, whatami) {
+  console.log('actor ' + whoami + ': ' + whatami);
 }).on('close', function(channel) {
   console.log(channel + ' close');
   process.exit(0);

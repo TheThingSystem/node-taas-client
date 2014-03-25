@@ -227,9 +227,11 @@ ClientAPI.prototype._console = function(self) {
   }).on('message', function(data, flags) {
     var category, i, logs, message;
 
-    if ((!!flags) && (flags.binary === true)) return self.emit(new Error('binary console message'));
+    if ((!!flags) && (flags.binary === true)) return self.emit('error', new Error('binary console message'), 'console');
 
-    try { message = JSON.parse(data.toString()); } catch(ex) { return self.emit(new Error('error parsing console message')); }
+    try { message = JSON.parse(data.toString()); } catch(ex) {
+      return self.emit('error', new Error('error parsing console message'), 'console');
+    }
     if (!!message.requestID) return;
 
     for (category in message) if (message.hasOwnProperty(category)) {
@@ -271,9 +273,11 @@ ClientAPI.prototype._manage = function(self) {
   }).on('message', function(data, flags) {
     var callback, doneP, message, requestID;
 
-    if ((!!flags) && (flags.binary === true)) return self.emit(new Error('binary management message'));
+    if ((!!flags) && (flags.binary === true)) return self.emit('error', new Error('binary management message'), 'management');
 
-    try { message = JSON.parse(data.toString()); } catch(ex) {return self.emit(new Error('error parsing management message')); }
+    try { message = JSON.parse(data.toString()); } catch(ex) {
+      return self.emit('error', new Error('error parsing management message'), 'management');
+    }
 
     requestID = message.requestID.toString();
 

@@ -9,7 +9,7 @@ talking either directly to the steward or through a [TAAS server](http://github.
 Install
 -------
 
-    npm install node-taas-client
+    npm install taas-client
 
 API
 ---

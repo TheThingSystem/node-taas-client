@@ -12,9 +12,12 @@ var steward = new ClientAPI.ClientAPI(
 }).on('open', function(channel, loginP) {
   console.log('open ' + channel);
 
-  if (!loginP) return;
+  if (!loginP) {
+    if (channel === 'management') console.log('steward in developer mode, no need to log in.');
+    return;
+  }
 
-// fill-these in please...
+// please open https://steward.local:8888/client.html and create a 'resident' account and enter the information below.
   var clientID = '.../...'
     , loginCode = speakeasy.totp({ key      : '................................................................'
                                  , length   : 6
@@ -22,6 +25,10 @@ var steward = new ClientAPI.ClientAPI(
                                  , step     : 30 })
     ;
 
+  if (clientID === '.../...') {
+    console.log('please fill-in values for clientID and loginCode, cf., the comment in the code');
+    process.exit(0);
+  }
   steward.login(clientID, loginCode, function(err, result) {
     if (!!err) {
       console.log('login error: ' + JSON.stringify(result));

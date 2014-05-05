@@ -64,7 +64,10 @@ Instead, you may choose to start over or exit, as you see fit.
                 }
     }).on('open', function(channel, loginP) {
       // check to see if login required
-      if (!loginP) return;
+      if (!loginP) {
+        if (channel === 'management') console.log('steward in developer mode, no need to log in.');
+        return;
+      }
 
       steward.login('mrose/7', '889791', function(err, error) {
         if (!!err) return console.log('>>> login error: ' + JSON.stringify(error));

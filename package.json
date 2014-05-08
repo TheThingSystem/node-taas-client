@@ -1,6 +1,6 @@
 {
   "name"           : "taas-client"
-, "version"        : "0.4.4"
+, "version"        : "0.4.5"
 , "description"    : "Things-as-a-service, client-side."
 , "author"         : {
     "name"         : "Marshall Rose"

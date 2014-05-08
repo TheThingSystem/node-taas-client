@@ -41,6 +41,12 @@ var activities =
   , event              : 'condition4'
   , task               : 'action4'
   }
+
+, activity5            :
+  { name               : 'vehicle secured when not at home'
+  , event              : 'condition5'
+  , task               : 'action5'
+  }
 };
 
 var events =
@@ -77,6 +83,15 @@ var events =
   , subordinates       : [ 'notAtHomeCharger'
                          , 'nowCharging'
                          , 'chargingDoneWithin5m'
+                         ]
+  }
+
+, condition5           :
+  { name               : 'vehicle secured when not at home'
+  , operator           : 'and'
+  , subordinates       : [ 'notAtHomeCharger'
+                         , 'stoppedForAtLeast5m'
+                         , 'notLockedAndClosed'
                          ]
   }
 
@@ -156,6 +171,26 @@ var events =
   { condition          : { operator: 'less-than',    operand1: '.[.batteryLevel.3].',        operand2: 301                   }
   }
 
+, notLockedAndClosed   :
+  { operator           : 'or'
+  , subordinates       : [ 'doorsNotLocked'
+                         , 'frunkOpen'
+                         , 'trunkOpen'
+                         ]
+  }
+
+, doorsNotLocked :
+  { condition          : { operator: 'not-equals',  operand1: '.[.doors].',                 operand2: 'locked'               }
+  }
+
+, frunkOpen            :
+  { condition          : { operator: 'equals',       operand1: '.[.frunk].',                 operand2: 'open'                }
+  }
+
+, trunkOpen            :
+  { condition          : { operator: 'equals',       operand1: '.[.trunk].',                 operand2: 'open'                }
+  }
+
 // LATER: temperature adjustments, vehicle moving away from associated user(s)
 };
 
@@ -185,6 +220,13 @@ var tasks =
   { name               : 'charging complete in about 5m'
   , behavior           : { perform   : 'growl'
                          , parameter : { priority: 'warning', message: 'charging complete in about 5m' }
+                         }
+  }
+
+, action5              :
+  { name               : 'vehicle not secured'
+  , behavior           : { perform   : 'growl'
+                         , parameter : { priority: 'warning', message: 'vehicle not secured' }
                          }
   }
 };

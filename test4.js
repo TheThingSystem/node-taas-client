@@ -176,6 +176,7 @@ var events =
   , subordinates       : [ 'doorsNotLocked'
                          , 'frunkOpen'
                          , 'trunkOpen'
+                         , 'sunroofOpen'
                          ]
   }
 
@@ -189,6 +190,10 @@ var events =
 
 , trunkOpen            :
   { condition          : { operator: 'equals',       operand1: '.[.trunk].',                 operand2: 'open'                }
+  }
+
+, sunroofOpen          :
+  { condition          : { operator: 'equals',       operand1: '.[.sunroof].',               operand2: 'open'                }
   }
 
 // LATER: temperature adjustments, vehicle moving away from associated user(s)

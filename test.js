@@ -27,12 +27,12 @@ var steward = new ClientAPI.ClientAPI(
 
   if (clientID === '.../...') {
     console.log('please fill-in values for clientID and loginCode, cf., the comment in the code');
-    process.exit(0);
+    process.exit(1);
   }
   steward.login(clientID, loginCode, function(err, result) {
     if (!!err) {
       console.log('login error: ' + JSON.stringify(result));
-      process.exit(0);
+      process.exit(1);
     }
 
     console.log('logged in');
@@ -50,8 +50,8 @@ var steward = new ClientAPI.ClientAPI(
   console.log('actor ' + whoami + ': ' + whatami);
 }).on('close', function(channel) {
   console.log(channel + ' close');
-  process.exit(0);
+  process.exit(1);
 }).on('error', function(err, channel) {
   console.log(channel + ' error: ' + err.message);
-  process.exit(0);
+  process.exit(1);
 });

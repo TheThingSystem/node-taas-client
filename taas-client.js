@@ -278,6 +278,7 @@ ClientAPI.prototype._manage = function(self) {
     try { message = JSON.parse(data.toString()); } catch(ex) {
       return self.emit('error', new Error('error parsing management message'), 'management');
     }
+    self.logger.debug('management', message);
 
     requestID = message.requestID.toString();
 
@@ -360,6 +361,7 @@ ClientAPI.prototype._send = function(json, callback, onceP) {
   if (!self.manage) throw new Error('management channel not open');
 
   json.requestID = self.addCallback(callback, onceP ? 1 : 2);
+  self.logger.debug('management', json);
   self.manage.send(JSON.stringify(json));
 
   return self;
@@ -384,7 +386,7 @@ ClientAPI.prototype.createActivity = function(name, uuid, event, task, armed, co
 
 ClientAPI.prototype.createDevice = function(name, uuid, whatami, info, comments, cb) {
   if ((!name)    || (name.length === 0))    throw new Error('name must be non-empty');
-  if ((!uuid)    || (uuid.length === 0))  throw new Error('uuid must be non-empty');
+  if ((!uuid)    || (uuid.length === 0))    throw new Error('uuid must be non-empty');
   if ((!whatami) || (whatami.length === 0)) throw new Error('whatami must be non-empty');
 
   return this._send({ path      : '/api/v1/device/create/' + name
@@ -398,7 +400,7 @@ ClientAPI.prototype.createDevice = function(name, uuid, whatami, info, comments,
 
 ClientAPI.prototype.createEvent = function(name, uuid, actor, observe, parameter, comments, cb) {
   if ((!name)    || (name.length === 0))    throw new Error('name must be non-empty');
-  if ((!uuid)    || (uuid.length === 0))  throw new Error('uuid must be non-empty');
+  if ((!uuid)    || (uuid.length === 0))    throw new Error('uuid must be non-empty');
   if ((!actor)   || (actor.length === 0))   throw new Error('actor must be non-empty');
   if ((!observe) || (observe.length === 0)) throw new Error('observe must be non-empty');
 
@@ -414,7 +416,7 @@ ClientAPI.prototype.createEvent = function(name, uuid, actor, observe, parameter
 
 ClientAPI.prototype.createGroup = function(name, uuid, type, operator, members, comments, cb) {
   if ((!name)    || (name.length === 0))    throw new Error('name must be non-empty');
-  if ((!uuid)    || (uuid.length === 0))  throw new Error('uuid must be non-empty');
+  if ((!uuid)    || (uuid.length === 0))    throw new Error('uuid must be non-empty');
 
   return this._send({ path      : '/api/v1/group/create/' + name
                     , name      : name
@@ -428,7 +430,7 @@ ClientAPI.prototype.createGroup = function(name, uuid, type, operator, members, 
 
 ClientAPI.prototype.createTask = function(name, uuid, actor, perform, parameter, comments, cb) {
   if ((!name)    || (name.length === 0))    throw new Error('name must be non-empty');
-  if ((!uuid)    || (uuid.length === 0))  throw new Error('uuid must be non-empty');
+  if ((!uuid)    || (uuid.length === 0))    throw new Error('uuid must be non-empty');
   if ((!actor)   || (actor.length === 0))   throw new Error('actor must be non-empty');
   if ((!perform) || (perform.length === 0)) throw new Error('perform must be non-empty');
 

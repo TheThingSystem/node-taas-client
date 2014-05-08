@@ -13,10 +13,10 @@ new ClientAPI.ClientAPI({ steward: { name: '127.0.0.1' } }).on('open', function(
   if (data.indexOf('read') !== -1) throw new Error('script requires write access');
 }).on('close', function(channel) {
   console.log(channel + ' close');
-  process.exit(0);
+  process.exit(1);
 }).on('error', function(err, channel) {
   console.log(channel + ' error: ' + err.message);
-  process.exit(0);
+  process.exit(1);
 });
 
 

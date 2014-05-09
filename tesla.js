@@ -103,11 +103,11 @@ var events =
   }
 
 , stopped              :
-  { condition          : { operator: 'equals',       operand1: '.[.velocity].',              operand2: 0                    }
+  { condition          : { operator: 'equals',       operand1: '.[.velocity].',              operand2: 0                     }
   }
 
 , sameCycleForAtLeast5m:
-  { condition          : { operator: 'greater-than', operand1: '.[.cycleTime].',             operand2: 299                   }
+  { condition          : { operator: 'greater-than', operand1: '.[.cycleTime.ago].',         operand2: 299                   }
   }
 
 , atNight              :

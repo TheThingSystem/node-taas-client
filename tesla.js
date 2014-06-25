@@ -47,6 +47,24 @@ var activities =
   , event              : 'condition5'
   , task               : 'action5'
   }
+
+, activity6            :
+  { name               : 'status when stopped'
+  , event              : 'condition6'
+  , task               : 'action6'
+  }
+
+, activity7            :
+  { name               : 'status when moving'
+  , event              : 'condition7'
+  , task               : 'action7'
+  }
+
+, activity8            :
+  { name               : 'monitor charging status'
+  , event              : 'condition8'
+  , task               : 'action8'
+  }
 };
 
 var events =
@@ -95,11 +113,43 @@ var events =
                          ]
   }
 
+, condition6           :
+  { name               : 'status when stopped'
+  , operator           : 'and'
+  , subordinates       : [ 'stoppedForAtLeast5m' ]
+  }
+
+, condition7           :
+  { name               : 'status when moving'
+  , operator           : 'and'
+  , subordinates       : [ 'moving'
+                         , 'hourly'
+                         ]
+  }
+
+, condition8           :
+  { name               : 'charger status'
+  , operator           : 'or'
+  , subordinates       : [ 'nowCharging'
+                         , 'doneCharging'
+                         , 'pluggedInNotCharging'
+                         , 'notPluggedIn'
+                         ]
+  }
+
 , stoppedForAtLeast5m  :
   { operator           : 'and'
   , subordinates       : [ 'stopped'
                          , 'sameCycleForAtLeast5m'
                          ]
+  }
+
+, moving               :
+  { condition          : { operator: 'greater-than', operand1: '.[.velocity].',              operand2: 0                     }
+  }
+
+, hourly               :
+  { observe            : { actor   : 'place/1',      observe: 'cron',                        parameter: '@hourly'            }
   }
 
 , stopped              :
@@ -167,6 +217,10 @@ var events =
   { condition          : { operator: 'equals',       operand1: '.[.charger].',               operand2: 'charging'            }
   }
 
+, doneCharging          :
+  { condition          : { operator: 'equals',       operand1: '.[.charger].',               operand2: 'completed'           }
+  }
+
 , chargingDoneWithin5m :
   { condition          : { operator: 'less-than',    operand1: '.[.batteryLevel.3].',        operand2: 301                   }
   }
@@ -203,35 +257,56 @@ var tasks =
 { action1              :
   { name               : 'charger not plugged in at home, at night'
   , behavior           : { perform   : 'growl'
-                         , parameter : { priority: 'warning', message: 'not plugged into home charger' }
+                         , parameter : { priority: 'warning', message: '.[.[device]..name]. not plugged into home charger' }
                          }
   }
 
 , action2              :
   { name               : 'charger not plugged in at charging station'
   , behavior           : { perform   : 'growl'
-                         , parameter : { priority: 'warning', message: 'not plugged in at charging station' }
+                         , parameter : { priority: 'warning', message: '.[.[device]..name]. not plugged in at charging station' }
                          }
   }
 
 , action3              :
   { name               : 'charger plugged in, but not charging'
   , behavior           : { perform   : 'growl'
-                         , parameter : { priority: 'warning', message: 'charger plugged in, but not charging' }
+                         , parameter : { priority: 'warning', message: '.[.[device]..name]. charger plugged in, but not charging' }
                          }
   }
 
 , action4              :
   { name               : 'charging complete in about 5m'
   , behavior           : { perform   : 'growl'
-                         , parameter : { priority: 'warning', message: 'charging complete in about 5m' }
+                         , parameter : { priority: 'warning', message: '.[.[device]..name]. charging complete in about 5m' }
                          }
   }
 
 , action5              :
   { name               : 'vehicle not secured'
   , behavior           : { perform   : 'growl'
-                         , parameter : { priority: 'warning', message: 'vehicle not secured' }
+                         , parameter : { priority: 'warning', message: '.[.[device]..name]. vehicle not secured' }
+                         }
+  }
+
+, action6              :
+  { name               : 'status when stopped'
+  , behavior           : { perform   : 'growl'
+                         , parameter : { message: '.[.[device]..name]. at .[.[device]..physical]., range: .[.[device]..range].km' }
+                         }
+  }
+
+, action7              :
+  { name               : 'status when moving'
+  , behavior           : { perform   : 'growl'
+                         , parameter : { message: '.[.[device]..name]. at .[.[device]..physical]., speed: .[.[device]..velocity].m/s, range: .[.[device]..range].km, charge: .[.[device]..batteryLevel.0].%' }
+                         }
+  }
+
+, action8              :
+  { name               : 'charing status'
+  , behavior           : { perform   : 'growl'
+                         , parameter : { message: '.[.[device]..name]. charger .[.[device]..charger].' }
                          }
   }
 };
@@ -271,7 +346,7 @@ var preflight = function(client) {
     if (entry.whatami.lastIndexOf('/text') !== (entry.whatami.length - 5)) continue;
 
     growler = entry.whoami;
-    break;
+    if (entry.whatami === '/device/indicator/twitter/text') break;
   }
   if (!growler) {
     console.log('no growl performers found!');
@@ -392,18 +467,30 @@ var createGroup = function(client, entry, type, group, parent, callback) {
        return callback(null, group.actor);
      }
 
-     callback(new Error('create ' + group.	dname + ' returns ' + JSON.stringify(message)));
+     callback(new Error('create ' + group.name + ' returns ' + JSON.stringify(message)));
     });
   });
 };
 
 var createEvent = function(client, entry, event, events, callback) {
+  var actor, observe, parameter;
+
   if (!!event.operator) return createGroup(client, entry, 'event', event, events, callback);
 
   if (!!event.actor) return callback(null, event.actor);
 
-  client.createEvent(entry.name + ' ' + event.id, uuid + ':event:' + event.id + ':' + entry.deviceID, entry.whoami,
-                     '.condition', event.condition, '', function(message) {
+  if (!!event.condition) {
+    actor = entry.whoami;
+    observe = '.condition';
+    parameter =  event.condition;
+  } else {
+    actor = event.observe.actor;
+    observe = event.observe.observe;
+    parameter =  event.observe.parameter;
+  }
+
+  client.createEvent(entry.name + ' ' + event.id, uuid + ':event:' + event.id + ':' + entry.deviceID, actor, observe,
+                     parameter, '', function(message) {
      if ((!message.result) && (!message.error)) return;
 
      if ((!!message.result) && (!!message.result.event)) {
@@ -420,13 +507,24 @@ var createEvent = function(client, entry, event, events, callback) {
 };
 
 var createTask = function(client, entry, task, tasks, callback) {
+  var actor, perform, parameter, pattern, replace;
+
   if (!!task.operator) return createGroup(client, entry, 'task', task, tasks, callback);
 
   if (!!task.actor) return callback(null, task.actor);
 
-  task.behavior.parameter.message = entry.name + ' ' + task.behavior.parameter.message;
-  client.createTask(entry.name + ' ' + task.id, uuid + ':task:' + task.id + ':' + entry.deviceID, task.behavior.actor,
-                     task.behavior.perform, task.behavior.parameter, '', function(message) {
+  actor = task.behavior.actor;
+  perform = task.behavior.perform;
+  parameter = task.behavior.parameter;
+
+  pattern = /\.\[device\]\./g;
+  replace = 'device/'+ entry.deviceID;
+  parameter.message = parameter.message.replace(pattern, replace);
+  parameter.location = '.[.[device]..location].'.replace(pattern, replace);
+  parameter.imageurl = 'http://maps.googleapis.com/maps/api/staticmap?center=.[.[device]..location.0].,.[.[device]..location.1].&zoom=15&size=400x400&maptype=roadmap&markers=icon:http://thethingsystem.com/actors/place-vehicle.png%7Cshadow:false%7C.[.[device]..location.0].,.[.[device]..location.1].&sensor=false'.replace(pattern, replace);
+
+  client.createTask(entry.name + ' ' + task.id, uuid + ':task:' + task.id + ':' + entry.deviceID, actor, perform, parameter,
+                    '', function(message) {
      if ((!message.result) && (!message.error)) return;
 
      if ((!!message.result) && (!!message.result.task)) {

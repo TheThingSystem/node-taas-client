@@ -117,11 +117,13 @@ var ClientAPI = function(options) {
 
   if (!self.options.steward) self.options.steward = {};
 
-  setTimeout(function() {
+  self.timer = setInterval(function() {
     var ca, didP, entry, host;
 
     if ((self.options.steward.name === '127.0.0.1') || (self.options.steward.name === 'localhost')) {
       self.params.url = 'ws://localhost:8887';
+
+      clearInterval(self.timer);
       return self._console(self);
     }
 
@@ -144,11 +146,15 @@ var ClientAPI = function(options) {
         self.params.url = 'wss://' + entry.host + ':' + entry.port;
       }
 
+      clearInterval(self.timer);
       return self._console(self);
     }
 
     if ((!self.options.cloud) || (!self.options.steward.name)) {
-      return self.emit('error', new Error(didP ? 'no matching stewards' : 'no visible stewards'));
+      if (!didP) return;
+
+      clearInterval(self.timer);      
+      return self.emit('error', new Error('no matching stewards'));
     }
 
     self.params.url = 'wss://' + self.options.steward.name + '.' + self.options.cloud.service + ':443';
@@ -157,6 +163,8 @@ var ClientAPI = function(options) {
     if (util.isArray(ca)) ca = new Buffer(ca);
     if ((!ca) && (!!self.options.cloud.crtPath)) ca = fs.readFileSync(self.options.cloud.crtPath);
     if (!!ca) ca = [ ca ];
+
+    clearInterval(self.timer);
     self._cloud(self, ca);
   }, 250);
 

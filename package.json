@@ -20,10 +20,12 @@
   }
 , "dependencies"   : {
     "async"        : "0.2.10"
-  , "mdns"         : "2.2.0"
-  , "speakeasy"    : "git://github.com/TheThingSystem/speakeasy.git"
-  , "underscore"   : "1.5.1"
-  , "ws"           : "git://github.com/TheThingSystem/ws.git"
+  , "speakeasy"    : "2.x"
+  , "underscore"   : "1.x"
+  , "ws"           : "1.x"
+  }
+, "optionalDependencies" : {
+    "mdns"         : "2.2.0"
   }
 , "readmeFilename" : "README.md"
 }

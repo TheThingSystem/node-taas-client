@@ -16,7 +16,7 @@ try {
 	mdns = require('mdns')
 }
 catch(ex) {
-	self.logger.warning('_wss._tcp','mdns is not installed. skipping...')
+	console.log('_wss._tcp','mdns is not installed. skipping...')
 }
 
   

@@ -344,7 +344,7 @@ ClientAPI.prototype._merge = function(self, entry) {
   actor = self.actors[whoami];
 
   self.actors[whoami] = entry;
-  if ((self.readyP) && ((!actor) || (!underscore.isEqual(entry, actor)))) self.emit('actor', whoami, entry.whatami);
+  if ((self.readyP) && ((!actor) || (!underscore.isEqual(entry, actor)))) self.emit('actor', entry);
 };
 
 

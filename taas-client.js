@@ -314,6 +314,11 @@ ClientAPI.prototype._manage = function(self) {
   return self;
 };
 
+ClientAPI.prototype.close = function() {
+  this.console.close();
+  this.manage.close();
+}
+
 ClientAPI.prototype._list = function(self) {
   self.listActors('', { depth: 'all' }, function(message) {
     var deviceID, devices, deviceType, entry;

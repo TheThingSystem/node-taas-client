@@ -240,7 +240,6 @@ ClientAPI.prototype._console = function(self) {
 
     self.actors = {};
     self.permissions = [];
-    self._manage(self);
   }).on('message', function(data, flags) {
     var category, i, logs, message;
 
@@ -258,6 +257,7 @@ ClientAPI.prototype._console = function(self) {
         if ((category === 'notice') && (util.isArray(logs.permissions))) {
           self.permissions = logs.permissions;
           self.emit('ready', 'console', self.permissions);
+          self._manage(self);
           continue;
         }
         logs = [ logs ];

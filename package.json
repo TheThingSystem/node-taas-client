@@ -29,8 +29,5 @@
     "underscore": "1.x",
     "ws": "1.x"
   },
-  "optionalDependencies": {
-    "mdns": "2.2.0"
-  },
   "readmeFilename": "README.md"
 }

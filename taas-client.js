@@ -4,7 +4,6 @@
 var events      = require('events')
   , fs          = require('fs')
   , https       = require('https')
-  , mdns        = require('mdns')
   , os          = require('os')
   , url         = require('url')
   , underscore  = require('underscore')
@@ -12,7 +11,15 @@ var events      = require('events')
   , ws          = require('ws')
   ;
 
+var mdns = null;
+try {
+	mdns = require('mdns')
+}
+catch(ex) {
+	console.log('_wss._tcp','mdns is not installed. skipping...')
+}
 
+  
 var DEFAULT_LOGGER = { error   : function(msg, props) { console.log(msg); if (!!props) console.log(props);             }
                      , warning : function(msg, props) { console.log(msg); if (!!props) console.log(props);             }
                      , notice  : function(msg, props) { console.log(msg); if (!!props) console.log(props);             }
@@ -45,26 +52,28 @@ var Singleton = function(options) {
   }
 
   self.hosts = {};
-  try {
-    self.mdns = mdns.createBrowser(mdns.tcp('wss')).on('serviceUp', function(service) {
-      for (i = 0; i < service.addresses.length; i++) {
-        if (self.ifaddrs.indexOf(service.addresses[i]) !== -1) {
-          service.localhost = true;
-          break;
+  if (mdns) {
+    try {
+      self.mdns = mdns.createBrowser(mdns.tcp('wss')).on('serviceUp', function (service) {
+        for (i = 0; i < service.addresses.length; i++) {
+          if (self.ifaddrs.indexOf(service.addresses[i]) !== -1) {
+            service.localhost = true;
+            break;
+          }
         }
-      }
 
-      self.hosts[service.host] = service;
-    }).on('serviceDown', function(service) {
-      delete(self.hosts[service.host]);
-    }).on('serviceChanged', function(service) {
-      self.hosts[service.host] = service;
-    }).on('error', function(err) {
-      self.logger.error('_wss._tcp', { event: 'mdns', diagnostic: err.message });
-    });
-    self.mdns.start();
-  } catch(ex) {
-    self.logger.error('_wss._tcp', { event: 'browse', diagnostic: ex.message });
+        self.hosts[service.host] = service;
+      }).on('serviceDown', function (service) {
+        delete (self.hosts[service.host]);
+      }).on('serviceChanged', function (service) {
+        self.hosts[service.host] = service;
+      }).on('error', function (err) {
+        self.logger.error('_wss._tcp', { event: 'mdns', diagnostic: err.message });
+      });
+      self.mdns.start();
+    } catch (ex) {
+      self.logger.error('_wss._tcp', { event: 'browse', diagnostic: ex.message });
+    }
   }
 };
 
@@ -231,7 +240,6 @@ ClientAPI.prototype._console = function(self) {
 
     self.actors = {};
     self.permissions = [];
-    self._manage(self);
   }).on('message', function(data, flags) {
     var category, i, logs, message;
 
@@ -249,6 +257,7 @@ ClientAPI.prototype._console = function(self) {
         if ((category === 'notice') && (util.isArray(logs.permissions))) {
           self.permissions = logs.permissions;
           self.emit('ready', 'console', self.permissions);
+          self._manage(self);
           continue;
         }
         logs = [ logs ];
@@ -305,6 +314,11 @@ ClientAPI.prototype._manage = function(self) {
   return self;
 };
 
+ClientAPI.prototype.close = function() {
+  this.console.close();
+  this.manage.close();
+}
+
 ClientAPI.prototype._list = function(self) {
   self.listActors('', { depth: 'all' }, function(message) {
     var deviceID, devices, deviceType, entry;
@@ -335,7 +349,7 @@ ClientAPI.prototype._merge = function(self, entry) {
   actor = self.actors[whoami];
 
   self.actors[whoami] = entry;
-  if ((self.readyP) && ((!actor) || (!underscore.isEqual(entry, actor)))) self.emit('actor', whoami, entry.whatami);
+  if ((self.readyP) && ((!actor) || (!underscore.isEqual(entry, actor)))) self.emit('actor', entry);
 };
 
 
